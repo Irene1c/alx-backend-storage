@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """ A module that defines the class Cache """
+from functools import wraps
 import redis
 from typing import Union, Optional, Callable
 import uuid
-from functools import wraps
+
+
+r = redis.Redis()
 
 
 def count_calls(method: Callable) -> Callable:
@@ -44,6 +47,25 @@ def call_history(method: Callable) -> Callable:
         return output
 
     return wrapper
+
+
+def replay(method: Callable) -> None:
+    """ Function to display the history of calls of a
+        particular function
+    """
+
+    key1 = method.__qualname__ + ":inputs"
+    key2 = method.__qualname__ + ":outputs"
+
+    inputs = r.lrange(key1, 0, -1)
+    outputs = r.lrange(key2, 0, -1)
+
+    print(f"{method.__qualname__} was called {len(inputs)} times:")
+
+    for inputt, output in zip(inputs, outputs):
+        inp_str = inputt.decode('utf-8')
+        outp_str = output.decode('utf-8')
+        print(f"{method.__qualname__}(*{inp_str}) -> {outp_str}")
 
 
 class Cache:
