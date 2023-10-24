@@ -3,6 +3,26 @@
 import redis
 from typing import Union, Optional, Callable
 import uuid
+from functools import wraps
+
+
+def count_calls(method: Callable) -> Callable:
+    """ Implements a system to count how many times methods
+        of the Cache class are called
+    """
+
+    key = method.__qualname__
+
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        """ Function that increments the count every time the `method`
+            is called and returns value returned by the original method
+        """
+
+        self._redis.incr(key)
+        return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class Cache:
@@ -13,7 +33,9 @@ class Cache:
 
         self._redis = redis.Redis()
         self._redis.flushdb()
+        self.count_calls = {}
 
+    @count_calls
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """ A method that generates a random key, stores the input
             data in Redis using the random key and returns the key
@@ -23,6 +45,7 @@ class Cache:
         self._redis.set(key, data)
         return key
 
+    @count_calls
     def get(self, key: str,
             fn: Optional[Callable] = None) -> Union[str, int, float, None]:
         """ Method that retrieves data from Redis. The callable will
@@ -39,6 +62,7 @@ class Cache:
 
         return data
 
+    @count_calls
     def get_str(self, key: str) -> Union[str, None]:
         """ Method that will automatically parametrize Cache.get
             with the correct conversion function str()
@@ -51,6 +75,7 @@ class Cache:
         else:
             return None
 
+    @count_calls
     def get_int(self, key: str) -> Union[int, None]:
         """ Method that will automatically parametrize Cache.get
             with the correct conversion function int()
