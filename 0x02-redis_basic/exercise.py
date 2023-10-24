@@ -25,6 +25,27 @@ def count_calls(method: Callable) -> Callable:
     return wrapper
 
 
+def call_history(method: Callable) -> Callable:
+    """ Stores history of inputs and outputs for a particular function """
+
+    key1 = method.__qualname__ + ":inputs"
+    key2 = method.__qualname__ + ":outputs"
+
+    @wraps(method)
+    def wrapper(self, args):
+        """ Function that appends the input arguments """
+
+        self._redis.rpush(key1, f"('{args}',)")
+
+        output = method(self, args)
+
+        self._redis.rpush(key2, output)
+
+        return output
+
+    return wrapper
+
+
 class Cache:
     """ A class Cache """
 
@@ -36,6 +57,7 @@ class Cache:
         self.count_calls = {}
 
     @count_calls
+    @call_history
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """ A method that generates a random key, stores the input
             data in Redis using the random key and returns the key
@@ -46,6 +68,7 @@ class Cache:
         return key
 
     @count_calls
+    @call_history
     def get(self, key: str,
             fn: Optional[Callable] = None) -> Union[str, int, float, None]:
         """ Method that retrieves data from Redis. The callable will
@@ -63,6 +86,7 @@ class Cache:
         return data
 
     @count_calls
+    @call_history
     def get_str(self, key: str) -> Union[str, None]:
         """ Method that will automatically parametrize Cache.get
             with the correct conversion function str()
@@ -76,6 +100,7 @@ class Cache:
             return None
 
     @count_calls
+    @call_history
     def get_int(self, key: str) -> Union[int, None]:
         """ Method that will automatically parametrize Cache.get
             with the correct conversion function int()
